@@ -1,0 +1,27 @@
+# Build artifacts
+/target/
+/ui/dist/
+/ui/node_modules/
+
+# IDE
+/.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Installer output
+*.exe
+!installer/installer.nsi
+
+# Driver build intermediates
+*.pdb
+*.exp
+*.lib
+

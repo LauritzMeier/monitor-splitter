@@ -1,0 +1,71 @@
+;; Monitor Splitter IddCx Driver INF
+;; Windows Indirect Display Driver (IDD) for virtual monitor splitting
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = Display
+ClassGUID   = {4d36e968-e325-11ce-bfc1-08002be10318}
+Provider    = %ManufacturerName%
+CatalogFile = MonitorSplitter.cat
+DriverVer   = 05/28/2026,0.1.0.0
+PnpLockdown = 1
+
+[Manufacturer]
+%ManufacturerName% = Standard, NTamd64
+
+[Standard.NTamd64]
+%DeviceName% = MonitorSplitter_Install, Root\MonitorSplitter
+
+[SourceDisksFiles]
+monitor_splitter_driver.sys = 1
+
+[SourceDisksNames]
+1 = %DiskName%
+
+[DestinationDirs]
+MonitorSplitter_Files = 13
+
+[MonitorSplitter_Install.NT]
+CopyFiles = MonitorSplitter_Files
+
+[MonitorSplitter_Files]
+monitor_splitter_driver.sys
+
+;; ─── WDF / KMDF Section ─────────────────────────────────────────────────────
+
+[MonitorSplitter_Install.NT.Wdf]
+KmdfService = MonitorSplitter, MonitorSplitter_wdfsect
+
+[MonitorSplitter_wdfsect]
+KmdfLibraryVersion = 1.33
+
+;; ─── Service Installation ───────────────────────────────────────────────────
+
+[MonitorSplitter_Install.NT.Services]
+AddService = MonitorSplitter, 0x00000002, MonitorSplitter_Service_Install
+
+[MonitorSplitter_Service_Install]
+DisplayName   = %ServiceName%
+ServiceType   = 1                  ; SERVICE_KERNEL_DRIVER
+StartType     = 3                  ; SERVICE_DEMAND_START
+ErrorControl  = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary = %13%\monitor_splitter_driver.sys
+
+;; ─── IddCx Settings ────────────────────────────────────────────────────────
+
+[MonitorSplitter_Install.NT.HW]
+AddReg = MonitorSplitter_HW_AddReg
+
+[MonitorSplitter_HW_AddReg]
+; IddCx adapter flags
+HKR,, "UpperFilters", %REG_MULTI_SZ%, "IddCx"
+
+;; ─── Strings ────────────────────────────────────────────────────────────────
+
+[Strings]
+ManufacturerName = "Monitor Splitter Project"
+DeviceName       = "Monitor Splitter Virtual Display"
+ServiceName      = "Monitor Splitter Virtual Display Driver"
+DiskName         = "Monitor Splitter Installation Disk"
+REG_MULTI_SZ     = 0x00010000
+

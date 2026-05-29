@@ -1,0 +1,25 @@
+[package]
+name = "monitor-splitter-driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "IddCx virtual display driver for monitor-splitter"
+
+[dependencies]
+monitor-splitter-common = { path = "../common" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# WDK dependencies — only compile on Windows with the WDK installed
+[target.'cfg(windows)'.dependencies]
+# wdk = "0.3"
+# wdk-sys = "0.3"
+# wdk-alloc = "0.3"
+
+[build-dependencies]
+# wdk-build = "0.3"
+
+[lib]
+# For driver builds, this becomes a cdylib (.sys)
+# crate-type = ["cdylib"]
+

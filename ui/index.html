@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monitor Splitter</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Monitor Splitter</h1>
+        <div class="status" id="driver-status">Disconnected</div>
+      </header>
+
+      <section>
+        <div class="canvas-wrap">
+          <canvas id="layout-canvas" width="800" height="260"></canvas>
+        </div>
+      </section>
+
+      <section>
+        <h2>Splits</h2>
+        <div id="split-list"></div>
+        <div class="split-actions">
+          <button id="btn-add-split" class="btn-primary">+ Add Split</button>
+          <button id="btn-remove-last" class="btn-ghost">Remove Last</button>
+          <button id="btn-reset" class="btn-danger">Reset</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Presets</h2>
+        <div class="preset-bar">
+          <button class="preset-chip" data-preset="2h">2× Even</button>
+          <button class="preset-chip" data-preset="3h">3× Even</button>
+          <button class="preset-chip" data-preset="21">⅔ + ⅓</button>
+          <button class="preset-chip" data-preset="12">⅓ + ⅔</button>
+          <button class="preset-chip" data-preset="121">25-50-25</button>
+          <button class="preset-chip" data-preset="grid">2×2</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Saved</h2>
+        <div id="saved-list" class="saved-list">
+          <p class="empty">No saved presets</p>
+        </div>
+        <button id="btn-save" class="btn-secondary">Save current layout</button>
+      </section>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+

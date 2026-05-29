@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ─── Common crate (builds on all platforms) ─────────────────────────────────
+  check-common:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo check -p monitor-splitter-common
+      - run: cargo test -p monitor-splitter-common
+
+  # ─── Driver (Windows only, requires WDK) ───────────────────────────────────
+  build-driver:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install WDK
+        run: |
+          choco install windowsdriverkit11 -y
+          # Add WDK to PATH
+          $wdkPath = "C:\Program Files (x86)\Windows Kits\10"
+          echo "$wdkPath\bin\10.0.22621.0\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build driver
+        run: |
+          cd driver
+          cargo build --release
+        env:
+          RUSTFLAGS: "-Z pre-link-arg=/DRIVER -Z pre-link-arg=/SUBSYSTEM:NATIVE"
+
+      - name: Create self-signed test certificate
+        run: |
+          $cert = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject "CN=Monitor Splitter Test" `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -NotAfter (Get-Date).AddYears(3)
+          $thumbprint = $cert.Thumbprint
+          echo "CERT_THUMBPRINT=$thumbprint" >> $env:GITHUB_ENV
+
+      - name: Sign driver
+        run: |
+          $inf = "driver/MonitorSplitter.inf"
+          # Sign the .sys file
+          signtool sign /v /s My /n "Monitor Splitter Test" /t http://timestamp.digicert.com `
+            target/release/monitor_splitter_driver.sys
+          # Generate .cat file
+          inf2cat /driver:target/release /os:10_X64
+          signtool sign /v /s My /n "Monitor Splitter Test" /t http://timestamp.digicert.com `
+            target/release/monitor_splitter_driver.cat
+
+      - name: Upload driver artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: driver-bundle
+          path: |
+            target/release/monitor_splitter_driver.sys
+            driver/MonitorSplitter.inf
+            target/release/*.cat
+
+  # ─── App (builds on Windows for releases) ──────────────────────────────────
+  build-app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        run: |
+          cd ui
+          npm install
+
+      - name: Build Tauri app
+        run: |
+          cargo install tauri-cli --version "^2.0"
+          cd app
+          cargo tauri build
+
+      - name: Upload app artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-bundle
+          path: |
+            target/release/bundle/
+
+  # ─── Installer ─────────────────────────────────────────────────────────────
+  build-installer:
+    runs-on: windows-latest
+    needs: [build-driver, build-app]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download driver bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: driver-bundle
+          path: installer/driver/
+
+      - name: Download app bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: app-bundle
+          path: installer/app/
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Build installer
+        run: |
+          cd installer
+          makensis installer.nsi
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MonitorSplitter-Setup
+          path: installer/MonitorSplitter-Setup.exe
+
+  # ─── Release ───────────────────────────────────────────────────────────────
+  release:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    needs: [build-installer]
+    permissions:
+      contents: write
+    steps:
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: MonitorSplitter-Setup
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MonitorSplitter-Setup.exe
+

@@ -1,0 +1,8 @@
+# Rust toolchain configuration
+# Nightly required for WDK driver compilation
+
+[toolchain]
+channel = "nightly"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-pc-windows-msvc"]
+
