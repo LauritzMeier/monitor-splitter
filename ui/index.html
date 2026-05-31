@@ -1,55 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Monitor Splitter</title>
-    <link rel="stylesheet" href="/src/style.css" />
-  </head>
-  <body>
-    <div id="app">
-      <header>
-        <h1>Monitor Splitter</h1>
-        <div class="status" id="driver-status">Disconnected</div>
-      </header>
+<head>
+  <meta charset="UTF-8" />
+  <title>Monitor Splitter</title>
+  <style>
+    :root { --bg:#111; --bg2:#191919; --bg3:#222; --fg:#e0e0e0; --fg2:#888; --fg3:#555; --accent:#5b9bf7; --danger:#e55; --border:#2a2a2a; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,"Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+    #app { max-width:840px; margin:0 auto; padding:1.2rem; }
+    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:.7rem; border-bottom:1px solid var(--border); }
+    header h1 { font-size:1.15rem; font-weight:600; }
+    .status { font-size:.72rem; padding:.2rem .6rem; border-radius:10px; background:var(--bg2); color:var(--fg3); border:1px solid var(--border); }
+    .status.ok { color:#6c6; border-color:#363; background:#161; }
+    section { margin-bottom:.9rem; padding:.9rem; background:var(--bg2); border-radius:8px; border:1px solid var(--border); }
+    h2 { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--fg2); margin-bottom:.6rem; font-weight:600; }
+    .canvas-wrap { background:#0a0a0a; border-radius:6px; padding:.5rem; }
+    canvas { width:100%; height:auto; border-radius:4px; display:block; }
+    .split-row { display:flex; align-items:center; gap:.5rem; padding:.4rem .5rem; background:var(--bg3); border-radius:5px; margin-bottom:.35rem; font-size:.8rem; }
+    .split-row .num { min-width:18px; font-weight:700; }
+    .split-row input[type=range] { flex:1; height:4px; accent-color:var(--accent); cursor:pointer; }
+    .split-row .val { min-width:80px; text-align:right; font-family:"SF Mono",monospace; font-size:.75rem; color:var(--fg); }
+    .actions { display:flex; gap:.35rem; margin-top:.5rem; }
+    button { padding:.4rem .8rem; border:none; border-radius:5px; font-size:.75rem; font-weight:500; cursor:pointer; transition:opacity .15s; }
+    button:hover { opacity:.85; } button:active { opacity:.7; }
+    .btn-p { background:var(--accent); color:#fff; }
+    .btn-g { background:transparent; color:var(--fg2); border:1px solid var(--border); }
+    .btn-d { background:transparent; color:var(--danger); border:1px solid #422; }
+    .btn-d:hover { background:#311; }
+    .presets { display:flex; gap:.35rem; flex-wrap:wrap; }
+    .presets button { padding:.35rem .65rem; background:var(--bg3); border:1px solid var(--border); border-radius:5px; color:var(--fg2); font-size:.75rem; }
+    .presets button:hover { border-color:var(--accent); color:var(--fg); }
+    .presets button.on { border-color:var(--accent); color:var(--accent); background:rgba(91,155,247,.1); }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Monitor Splitter</h1>
+    <div class="status" id="status">Disconnected</div>
+  </header>
 
-      <section>
-        <div class="canvas-wrap">
-          <canvas id="layout-canvas" width="800" height="260"></canvas>
-        </div>
-      </section>
+  <section>
+    <div class="canvas-wrap"><canvas id="cv" width="800" height="240"></canvas></div>
+  </section>
 
-      <section>
-        <h2>Splits</h2>
-        <div id="split-list"></div>
-        <div class="split-actions">
-          <button id="btn-add-split" class="btn-primary">+ Add Split</button>
-          <button id="btn-remove-last" class="btn-ghost">Remove Last</button>
-          <button id="btn-reset" class="btn-danger">Reset</button>
-        </div>
-      </section>
-
-      <section>
-        <h2>Presets</h2>
-        <div class="preset-bar">
-          <button class="preset-chip" data-preset="2h">2× Even</button>
-          <button class="preset-chip" data-preset="3h">3× Even</button>
-          <button class="preset-chip" data-preset="21">⅔ + ⅓</button>
-          <button class="preset-chip" data-preset="12">⅓ + ⅔</button>
-          <button class="preset-chip" data-preset="121">25-50-25</button>
-          <button class="preset-chip" data-preset="grid">2×2</button>
-        </div>
-      </section>
-
-      <section>
-        <h2>Saved</h2>
-        <div id="saved-list" class="saved-list">
-          <p class="empty">No saved presets</p>
-        </div>
-        <button id="btn-save" class="btn-secondary">Save current layout</button>
-      </section>
+  <section>
+    <h2>Splits</h2>
+    <div id="list"></div>
+    <div class="actions">
+      <button class="btn-p" onclick="addSplit()">+ Add</button>
+      <button class="btn-g" onclick="removeLast()">Remove last</button>
+      <button class="btn-d" onclick="reset()">Reset</button>
     </div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+  </section>
+
+  <section>
+    <h2>Presets</h2>
+    <div class="presets">
+      <button onclick="preset([50,50])">2 × equal</button>
+      <button onclick="preset([33,34,33])">3 × equal</button>
+      <button onclick="preset([67,33])">⅔ + ⅓</button>
+      <button onclick="preset([33,67])">⅓ + ⅔</button>
+      <button onclick="preset([25,50,25])">25 – 50 – 25</button>
+    </div>
+  </section>
+</div>
+
+<script>
+// ── state ──
+let S = [];
+const PW = 3840, PH = 1080;
+const C = ["#5b9bf7","#6c6","#f7a35b","#c77dff","#e55","#5be5e5"];
+const cv = document.getElementById("cv");
+const cx = cv.getContext("2d");
+
+function norm() { const t=S.reduce((a,b)=>a+b,0); return t?S.map(s=>s/t):[]; }
+function rnd(n) { return Math.round(n*10000)/10000; }
+function regions() { const f=norm(); let x=0; return f.map(w=>{ const r={x:rnd(x),y:0,width:rnd(w),height:1}; x+=w; return r; }); }
+
+// ── draw ──
+function draw() {
+  const W=cv.width, H=cv.height;
+  cx.fillStyle="#0a0a0a"; cx.fillRect(0,0,W,H);
+  const m=14, mW=W-m*2, mH=H-m*2;
+  cx.strokeStyle="#2a2a2a"; cx.lineWidth=2; cx.strokeRect(m,m,mW,mH);
+  if(!S.length){ cx.fillStyle="#555"; cx.font="14px system-ui"; cx.textAlign="center"; cx.textBaseline="middle"; cx.fillText("Add splits or pick a preset",W/2,H/2); return; }
+  const f=norm(); let x=m;
+  f.forEach((w,i)=>{
+    const rw=w*mW, c=C[i%C.length];
+    cx.fillStyle=c+"20"; cx.fillRect(x+1,m+1,rw-2,mH-2);
+    cx.strokeStyle=c+"88"; cx.lineWidth=1.5; cx.strokeRect(x+1,m+1,rw-2,mH-2);
+    cx.fillStyle=c; cx.font="bold 13px system-ui"; cx.textAlign="center"; cx.textBaseline="middle";
+    cx.fillText(Math.round(w*PW)+"×"+PH, x+rw/2, H/2-8);
+    cx.fillStyle=c+"99"; cx.font="11px system-ui";
+    cx.fillText(Math.round(w*100)+"%", x+rw/2, H/2+10);
+    x+=rw;
+  });
+}
+
+// ── list ──
+function renderList() {
+  const el=document.getElementById("list");
+  if(!S.length){ el.innerHTML=""; draw(); return; }
+  const f=norm();
+  el.innerHTML=S.map((w,i)=>`<div class="split-row"><span class="num" style="color:${C[i%C.length]}">${i+1}</span><input type="range" min="1" max="100" value="${w}" oninput="slide(${i},this.value)"><span class="val">${Math.round(f[i]*PW)}px · ${Math.round(f[i]*100)}%</span></div>`).join("");
+  draw();
+}
+
+function slide(i,v){ S[i]=+v; renderList(); send(); }
+
+// ── actions ──
+function addSplit(){ S.push(S.length?S[S.length-1]:50); renderList(); send(); }
+function removeLast(){ S.pop(); renderList(); send(); }
+function reset(){ S=[]; renderList(); invoke("remove_all").catch(()=>{}); }
+function preset(arr){ S=[...arr]; document.querySelectorAll(".presets button").forEach(b=>b.classList.remove("on")); event.target.classList.add("on"); renderList(); send(); }
+
+// ── driver IPC ──
+async function invoke(cmd, args) {
+  if(window.__TAURI__) return window.__TAURI__.core.invoke(cmd, args);
+  throw new Error("no tauri");
+}
+
+function send(){ if(!S.length)return; invoke("apply_split",{config:{monitor_index:0,regions:regions(),preset_name:null}}).catch(e=>console.error(e)); }
+
+// ── init ──
+invoke("get_physical_monitors").then(()=>{ const s=document.getElementById("status"); s.textContent="Connected"; s.classList.add("ok"); }).catch(()=>{});
+draw();
+</script>
+</body>
 </html>
 

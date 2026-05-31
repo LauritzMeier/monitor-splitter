@@ -22,7 +22,6 @@ fn main() {
     tracing::info!("Starting Monitor Splitter");
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_physical_monitors,
             commands::get_virtual_monitors,
@@ -45,4 +44,5 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
 

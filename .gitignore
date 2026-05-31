@@ -25,3 +25,4 @@ Thumbs.db
 *.exp
 *.lib
 
+ui/.vite/

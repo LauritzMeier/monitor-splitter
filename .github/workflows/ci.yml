@@ -83,16 +83,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install frontend dependencies
-        run: |
-          cd ui
-          npm install
-
       - name: Build Tauri app
         run: |
           cargo install tauri-cli --version "^2.0"
