@@ -83,6 +83,8 @@ pub struct VirtualMonitor {
 pub enum AppToDriver {
     /// Query available physical monitors.
     QueryMonitors,
+    /// Query current virtual monitor state.
+    QuerySplitState,
     /// Apply a split configuration.
     ApplySplit(SplitConfig),
     /// Remove all virtual monitors for a physical monitor.
@@ -319,4 +321,5 @@ mod tests {
         }
     }
 }
+
 

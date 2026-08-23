@@ -40,6 +40,10 @@ pub fn handle_message(
             monitors: manager.physical_monitors().to_vec(),
         },
 
+        AppToDriver::QuerySplitState => DriverToApp::SplitState {
+            virtual_monitors: manager.virtual_monitors().to_vec(),
+        },
+
         AppToDriver::ApplySplit(config) => match manager.apply_split(config) {
             Ok(_) => DriverToApp::SplitState {
                 virtual_monitors: manager.virtual_monitors().to_vec(),
@@ -131,5 +135,6 @@ mod tests {
         assert!(matches!(parsed, AppToDriver::Ping));
     }
 }
+
 
 

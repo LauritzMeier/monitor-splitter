@@ -2,62 +2,93 @@
 
 use monitor_splitter_common::*;
 
+#[cfg(windows)]
+async fn send_driver_message(msg: AppToDriver) -> Result<DriverToApp, String> {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::windows::named_pipe::ClientOptions;
+
+    let mut pipe = ClientOptions::new()
+        .open(PIPE_NAME)
+        .map_err(|e| format!("Failed to connect to driver pipe {}: {}", PIPE_NAME, e))?;
+
+    let payload = serde_json::to_vec(&msg).map_err(|e| format!("Failed to encode request: {}", e))?;
+    pipe.write_all(&payload)
+        .await
+        .map_err(|e| format!("Failed to send request to driver: {}", e))?;
+    pipe.write_all(b"\n")
+        .await
+        .map_err(|e| format!("Failed to finish request: {}", e))?;
+    pipe.flush()
+        .await
+        .map_err(|e| format!("Failed to flush request to driver: {}", e))?;
+
+    let mut reader = BufReader::new(pipe);
+    let mut line = String::new();
+    reader
+        .read_line(&mut line)
+        .await
+        .map_err(|e| format!("Failed to read driver response: {}", e))?;
+
+    if line.trim().is_empty() {
+        return Err("Driver returned an empty response".to_string());
+    }
+
+    serde_json::from_str::<DriverToApp>(line.trim())
+        .map_err(|e| format!("Failed to decode driver response: {}", e))
+}
+
+#[cfg(not(windows))]
+async fn send_driver_message(_msg: AppToDriver) -> Result<DriverToApp, String> {
+    Err("Monitor splitting is only available on Windows with the driver installed".to_string())
+}
+
 #[tauri::command]
 pub async fn get_physical_monitors() -> Result<Vec<PhysicalMonitor>, String> {
-    // TODO: Query from driver via named pipe
-    // For now, return mock data for UI development
-    Ok(vec![PhysicalMonitor {
-        index: 0,
-        name: "Primary Monitor".to_string(),
-        width: 3840,
-        height: 1080,
-        refresh_rate: 60,
-    }])
+    match send_driver_message(AppToDriver::QueryMonitors).await? {
+        DriverToApp::MonitorList { monitors } => Ok(monitors),
+        DriverToApp::Error { message } => Err(message),
+        other => Err(format!("Unexpected response from driver: {:?}", other)),
+    }
 }
 
 #[tauri::command]
 pub async fn get_virtual_monitors() -> Result<Vec<VirtualMonitor>, String> {
-    // TODO: Query from driver
-    Ok(vec![])
+    match send_driver_message(AppToDriver::QuerySplitState).await? {
+        DriverToApp::SplitState { virtual_monitors } => Ok(virtual_monitors),
+        DriverToApp::Error { message } => Err(message),
+        other => Err(format!("Unexpected response from driver: {:?}", other)),
+    }
 }
 
 #[tauri::command]
 pub async fn apply_split(config: SplitConfig) -> Result<Vec<VirtualMonitor>, String> {
-    // TODO: Send to driver via named pipe
     tracing::info!("Applying split: {:?}", config);
 
-    // For now, compute virtual monitors locally
-    let physical_width = 3840u32; // TODO: look up from actual monitor
-    let physical_height = 1080u32;
-
-    let vms: Vec<VirtualMonitor> = config
-        .regions
-        .iter()
-        .enumerate()
-        .map(|(i, region)| VirtualMonitor {
-            id: format!("vm-{}", i),
-            physical_monitor_index: config.monitor_index,
-            region: region.clone(),
-            width: (physical_width as f64 * region.width) as u32,
-            height: (physical_height as f64 * region.height) as u32,
-        })
-        .collect();
-
-    Ok(vms)
+    match send_driver_message(AppToDriver::ApplySplit(config)).await? {
+        DriverToApp::SplitState { virtual_monitors } => Ok(virtual_monitors),
+        DriverToApp::Error { message } => Err(message),
+        other => Err(format!("Unexpected response from driver: {:?}", other)),
+    }
 }
 
 #[tauri::command]
 pub async fn remove_splits(monitor_index: u32) -> Result<(), String> {
     tracing::info!("Removing splits for monitor {}", monitor_index);
-    // TODO: Send to driver
-    Ok(())
+    match send_driver_message(AppToDriver::RemoveSplits { monitor_index }).await? {
+        DriverToApp::SplitState { .. } | DriverToApp::Ok => Ok(()),
+        DriverToApp::Error { message } => Err(message),
+        other => Err(format!("Unexpected response from driver: {:?}", other)),
+    }
 }
 
 #[tauri::command]
 pub async fn remove_all() -> Result<(), String> {
     tracing::info!("Removing all virtual monitors");
-    // TODO: Send to driver
-    Ok(())
+    match send_driver_message(AppToDriver::RemoveAll).await? {
+        DriverToApp::Ok | DriverToApp::SplitState { .. } => Ok(()),
+        DriverToApp::Error { message } => Err(message),
+        other => Err(format!("Unexpected response from driver: {:?}", other)),
+    }
 }
 
 #[tauri::command]
@@ -91,5 +122,7 @@ pub async fn save_config(config: AppConfig) -> Result<(), String> {
     // TODO: Persist config
     Ok(())
 }
+
+
 
 

@@ -20,6 +20,8 @@
     .split-row .num { min-width:18px; font-weight:700; }
     .split-row input[type=range] { flex:1; height:4px; accent-color:var(--accent); cursor:pointer; }
     .split-row .val { min-width:80px; text-align:right; font-family:"SF Mono",monospace; font-size:.75rem; color:var(--fg); }
+    .row { display:flex; align-items:center; gap:.5rem; }
+    select { background:var(--bg3); color:var(--fg); border:1px solid var(--border); border-radius:5px; padding:.35rem .5rem; font-size:.8rem; min-width:360px; }
     .actions { display:flex; gap:.35rem; margin-top:.5rem; }
     button { padding:.4rem .8rem; border:none; border-radius:5px; font-size:.75rem; font-weight:500; cursor:pointer; transition:opacity .15s; }
     button:hover { opacity:.85; } button:active { opacity:.7; }
@@ -39,6 +41,13 @@
     <h1>Monitor Splitter</h1>
     <div class="status" id="status">Disconnected</div>
   </header>
+
+  <section>
+    <h2>Monitor</h2>
+    <div class="row">
+      <select id="monitor" onchange="onMonitorChange(this.value)"></select>
+    </div>
+  </section>
 
   <section>
     <div class="canvas-wrap"><canvas id="cv" width="800" height="240"></canvas></div>
@@ -69,7 +78,9 @@
 <script>
 // ── state ──
 let S = [];
-const PW = 3840, PH = 1080;
+let M = [];
+let monitorIndex = 0;
+let PW = 3840, PH = 1080;
 const C = ["#5b9bf7","#6c6","#f7a35b","#c77dff","#e55","#5be5e5"];
 const cv = document.getElementById("cv");
 const cx = cv.getContext("2d");
@@ -107,12 +118,32 @@ function renderList() {
   draw();
 }
 
+function renderMonitorSelect() {
+  const el = document.getElementById("monitor");
+  if (!M.length) {
+    el.innerHTML = "<option value='0'>No monitors detected</option>";
+    return;
+  }
+  el.innerHTML = M.map((m) => `<option value="${m.index}">${m.name} (${m.width}x${m.height} @ ${m.refresh_rate}Hz)</option>`).join("");
+  el.value = String(monitorIndex);
+}
+
+function onMonitorChange(value) {
+  monitorIndex = Number(value);
+  const monitor = M.find((m) => m.index === monitorIndex);
+  if (!monitor) return;
+  PW = monitor.width;
+  PH = monitor.height;
+  renderList();
+  if (S.length) send();
+}
+
 function slide(i,v){ S[i]=+v; renderList(); send(); }
 
 // ── actions ──
 function addSplit(){ S.push(S.length?S[S.length-1]:50); renderList(); send(); }
 function removeLast(){ S.pop(); renderList(); send(); }
-function reset(){ S=[]; renderList(); invoke("remove_all").catch(()=>{}); }
+function reset(){ S=[]; renderList(); invoke("remove_splits", { monitorIndex }).catch(()=>{}); }
 function preset(arr){ S=[...arr]; document.querySelectorAll(".presets button").forEach(b=>b.classList.remove("on")); event.target.classList.add("on"); renderList(); send(); }
 
 // ── driver IPC ──
@@ -121,12 +152,47 @@ async function invoke(cmd, args) {
   throw new Error("no tauri");
 }
 
-function send(){ if(!S.length)return; invoke("apply_split",{config:{monitor_index:0,regions:regions(),preset_name:null}}).catch(e=>console.error(e)); }
+function send() {
+  if(!S.length) return;
+  invoke("apply_split", { config: { monitor_index: monitorIndex, regions: regions(), preset_name: null } })
+    .then(() => {
+      const s = document.getElementById("status");
+      s.textContent = "Applied";
+      s.classList.add("ok");
+    })
+    .catch((e) => {
+      const s = document.getElementById("status");
+      s.textContent = "Apply failed";
+      s.classList.remove("ok");
+      console.error(e);
+    });
+}
+
+async function init() {
+  const s = document.getElementById("status");
+  try {
+    M = await invoke("get_physical_monitors");
+    if (M.length) {
+      monitorIndex = M[0].index;
+      PW = M[0].width;
+      PH = M[0].height;
+    }
+    renderMonitorSelect();
+    s.textContent = "Connected";
+    s.classList.add("ok");
+  } catch (e) {
+    renderMonitorSelect();
+    s.textContent = "Driver unavailable";
+    s.classList.remove("ok");
+    console.error(e);
+  }
+}
 
 // ── init ──
-invoke("get_physical_monitors").then(()=>{ const s=document.getElementById("status"); s.textContent="Connected"; s.classList.add("ok"); }).catch(()=>{});
+init();
 draw();
 </script>
 </body>
 </html>
+
 
