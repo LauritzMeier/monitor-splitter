@@ -1,4 +1,4 @@
-name: Build Installer
+name: Build Release
 
 on:
   workflow_dispatch:
@@ -6,12 +6,7 @@ on:
       tag:
         description: "Tag to publish (e.g. v0.1.0)"
         required: true
-        default: "v0.1.7"
-      require_driver:
-        description: "Fail build if driver artifacts are missing"
-        required: true
-        default: true
-        type: boolean
+        default: "v0.1.9"
   push:
     tags:
       - "v*"
@@ -33,67 +28,20 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install NSIS
-        shell: pwsh
-        run: |
-          choco install nsis --no-progress -y
-          $nsisDir = "C:\Program Files (x86)\NSIS"
-          if (!(Test-Path "$nsisDir\makensis.exe")) {
-            throw "makensis.exe not found at $nsisDir"
-          }
-          $nsisDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
       - name: Build app
         run: cargo build -p monitor-splitter-app --release --bin monitor-splitter
 
-      - name: Stage installer inputs
+      - name: Create portable zip
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path installer/app | Out-Null
-          New-Item -ItemType Directory -Force -Path installer/driver | Out-Null
-          Copy-Item target/release/monitor-splitter.exe installer/app/monitor-splitter.exe -Force
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path target/release/monitor-splitter.exe -DestinationPath dist/MonitorSplitter-Portable.zip -Force
 
-          if (Test-Path driver/monitor_splitter_driver.sys) {
-            Copy-Item driver/monitor_splitter_driver.sys installer/driver/monitor_splitter_driver.sys -Force
-          }
-          if (Test-Path driver/MonitorSplitter.inf) {
-            Copy-Item driver/MonitorSplitter.inf installer/driver/MonitorSplitter.inf -Force
-          }
-          if (Test-Path driver/MonitorSplitter.cat) {
-            Copy-Item driver/MonitorSplitter.cat installer/driver/MonitorSplitter.cat -Force
-          }
-
-      - name: Validate driver artifacts
-        shell: pwsh
-        run: |
-          $required = @(
-            "installer/driver/monitor_splitter_driver.sys",
-            "installer/driver/MonitorSplitter.inf",
-            "installer/driver/MonitorSplitter.cat"
-          )
-          $missing = @($required | Where-Object { -not (Test-Path $_) })
-          if ($missing.Count -gt 0) {
-            Write-Warning "Driver artifacts missing; building app-only installer: $($missing -join ', ')"
-          }
-
-      - name: Build NSIS installer
-        shell: pwsh
-        run: |
-          $hasDriver = (Test-Path installer/driver/monitor_splitter_driver.sys) -and (Test-Path installer/driver/MonitorSplitter.inf) -and (Test-Path installer/driver/MonitorSplitter.cat)
-          where.exe makensis
-          Push-Location installer
-          if ($hasDriver) {
-            & makensis installer.nsi
-          } else {
-            & makensis /DSKIP_DRIVER installer.nsi
-          }
-          Pop-Location
-
-      - name: Upload installer artifact
+      - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MonitorSplitter-Setup
-          path: installer/MonitorSplitter-Setup.exe
+          name: MonitorSplitter-Portable
+          path: dist/MonitorSplitter-Portable.zip
 
       - name: Publish release asset
         shell: pwsh
@@ -105,7 +53,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag --title $tag --generate-notes
           }
-          gh release upload $tag installer/MonitorSplitter-Setup.exe --clobber
+          gh release upload $tag dist/MonitorSplitter-Portable.zip --clobber
+
+
+
+
 
 
 

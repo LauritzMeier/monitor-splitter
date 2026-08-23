@@ -221,13 +221,7 @@ async function init() {
       PH = M[0].height;
     }
     renderMonitorSelect();
-    try {
-      await invoke("ping_driver");
-      setStatus("Connected", true);
-    } catch (e) {
-      setStatus("Driver unavailable", false);
-      setError(errText(e));
-    }
+    setStatus("Ready", true);
   } catch (e) {
     M = [];
     renderMonitorSelect();
@@ -243,6 +237,7 @@ draw();
 </script>
 </body>
 </html>
+
 
 
 

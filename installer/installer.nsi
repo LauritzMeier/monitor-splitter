@@ -50,10 +50,10 @@ Section "Monitor Splitter App" SecApp
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MonitorSplitter" \
     "Publisher" "Monitor Splitter Project"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MonitorSplitter" \
-    "DisplayVersion" "0.1.7"
+    "DisplayVersion" "0.1.9"
 SectionEnd
 
-!ifndef SKIP_DRIVER
+!ifdef INCLUDE_DRIVER
 Section "Virtual Display Driver" SecDriver
   SectionIn RO ; Required
 
@@ -102,11 +102,14 @@ SectionEnd
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecApp} "The Monitor Splitter application with UI and hotkey support."
-!ifndef SKIP_DRIVER
+!ifdef INCLUDE_DRIVER
   !insertmacro MUI_DESCRIPTION_TEXT ${SecDriver} "The IddCx virtual display driver that creates virtual monitors."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecTestSign} "Enable Windows test signing mode (required for the driver to load without an EV certificate)."
 !endif
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
+
+
+
 
 
 

@@ -30,7 +30,13 @@ async fn send_driver_message(msg: AppToDriver) -> Result<DriverToApp, String> {
 
     let mut pipe = ClientOptions::new()
         .open(PIPE_NAME)
-        .map_err(|e| format!("Failed to connect to driver pipe {}: {}", PIPE_NAME, e))?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "This release does not include the driver yet, so monitor splitting is unavailable.".to_string()
+            } else {
+                format!("Failed to connect to driver pipe {}: {}", PIPE_NAME, e)
+            }
+        })?;
 
     let payload = serde_json::to_vec(&msg).map_err(|e| format!("Failed to encode request: {}", e))?;
     pipe.write_all(&payload)
@@ -157,6 +163,7 @@ pub async fn save_config(config: AppConfig) -> Result<(), String> {
     // TODO: Persist config
     Ok(())
 }
+
 
 
 
