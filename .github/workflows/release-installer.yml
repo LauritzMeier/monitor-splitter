@@ -1,0 +1,69 @@
+name: Build Installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install NSIS
+        run: choco install nsis --no-progress -y
+
+      - name: Build app
+        run: cargo build -p monitor-splitter-app --release --bin monitor-splitter
+
+      - name: Stage installer inputs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/app | Out-Null
+          New-Item -ItemType Directory -Force -Path installer/driver | Out-Null
+          Copy-Item target/release/monitor-splitter.exe installer/app/monitor-splitter.exe -Force
+
+          if (Test-Path driver/monitor_splitter_driver.sys) {
+            Copy-Item driver/monitor_splitter_driver.sys installer/driver/monitor_splitter_driver.sys -Force
+          }
+          if (Test-Path driver/MonitorSplitter.inf) {
+            Copy-Item driver/MonitorSplitter.inf installer/driver/MonitorSplitter.inf -Force
+          }
+          if (Test-Path driver/MonitorSplitter.cat) {
+            Copy-Item driver/MonitorSplitter.cat installer/driver/MonitorSplitter.cat -Force
+          }
+
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          $hasDriver = (Test-Path installer/driver/monitor_splitter_driver.sys) -and (Test-Path installer/driver/MonitorSplitter.cat)
+          Push-Location installer
+          if ($hasDriver) {
+            & makensis installer.nsi
+          } else {
+            & makensis /DSKIP_DRIVER installer.nsi
+          }
+          Pop-Location
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MonitorSplitter-Setup
+          path: installer/MonitorSplitter-Setup.exe
+
+      - name: Publish release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/MonitorSplitter-Setup.exe
+
+
