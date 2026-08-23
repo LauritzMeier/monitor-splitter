@@ -7,6 +7,11 @@ on:
         description: "Tag to publish (e.g. v0.1.0)"
         required: true
         default: "v0.1.0"
+      require_driver:
+        description: "Fail build if driver artifacts are missing"
+        required: true
+        default: true
+        type: boolean
   push:
     tags:
       - "v*"
@@ -58,10 +63,32 @@ jobs:
             Copy-Item driver/MonitorSplitter.cat installer/driver/MonitorSplitter.cat -Force
           }
 
+      - name: Validate driver artifacts
+        shell: pwsh
+        run: |
+          $isTagBuild = "${{ github.event_name }}" -eq "push"
+          $requireDriverInput = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.require_driver || '' }}"
+          $requireDriver = $isTagBuild -or ($requireDriverInput -eq "true")
+
+          $required = @(
+            "installer/driver/monitor_splitter_driver.sys",
+            "installer/driver/MonitorSplitter.inf",
+            "installer/driver/MonitorSplitter.cat"
+          )
+          $missing = @($required | Where-Object { -not (Test-Path $_) })
+
+          if ($missing.Count -gt 0) {
+            if ($requireDriver) {
+              throw "Missing required driver artifacts for release: $($missing -join ', ')"
+            } else {
+              Write-Warning "Driver artifacts missing; building app-only installer: $($missing -join ', ')"
+            }
+          }
+
       - name: Build NSIS installer
         shell: pwsh
         run: |
-          $hasDriver = (Test-Path installer/driver/monitor_splitter_driver.sys) -and (Test-Path installer/driver/MonitorSplitter.cat)
+          $hasDriver = (Test-Path installer/driver/monitor_splitter_driver.sys) -and (Test-Path installer/driver/MonitorSplitter.inf) -and (Test-Path installer/driver/MonitorSplitter.cat)
           where.exe makensis
           Push-Location installer
           if ($hasDriver) {
@@ -88,6 +115,9 @@ jobs:
             gh release create $tag --title $tag --generate-notes
           }
           gh release upload $tag installer/MonitorSplitter-Setup.exe --clobber
+
+
+
 
 
 
