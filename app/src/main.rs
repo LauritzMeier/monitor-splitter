@@ -7,9 +7,6 @@
 //! - Named pipe client to communicate with the driver
 
 mod commands;
-mod config;
-mod hotkeys;
-mod pipe_client;
 
 use tracing_subscriber::EnvFilter;
 
@@ -34,15 +31,13 @@ fn main() {
             commands::get_config,
             commands::save_config,
         ])
-        .setup(|app| {
+        .setup(|_app| {
             tracing::info!("App setup complete");
-            // TODO: Initialize system tray
-            // TODO: Initialize global hotkeys
-            // TODO: Connect to driver pipe
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
 
 

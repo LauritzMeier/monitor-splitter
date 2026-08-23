@@ -1,17 +1,6 @@
 //! Tauri command handlers exposed to the frontend.
 
 use monitor_splitter_common::*;
-use tauri::State;
-use std::sync::Mutex;
-use crate::config::ConfigManager;
-
-/// Application state managed by Tauri.
-pub struct AppState {
-    pub config_manager: Mutex<ConfigManager>,
-    // In production, this would hold a pipe client connection
-    // For now, we maintain local state for UI development
-    pub virtual_monitors: Mutex<Vec<VirtualMonitor>>,
-}
 
 #[tauri::command]
 pub async fn get_physical_monitors() -> Result<Vec<PhysicalMonitor>, String> {
@@ -98,8 +87,9 @@ pub async fn get_config() -> Result<AppConfig, String> {
 
 #[tauri::command]
 pub async fn save_config(config: AppConfig) -> Result<(), String> {
-    tracing::info!("Saving config");
+    tracing::info!("Saving config with {} preset(s)", config.presets.len());
     // TODO: Persist config
     Ok(())
 }
+
 
