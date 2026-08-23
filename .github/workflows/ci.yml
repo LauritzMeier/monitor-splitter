@@ -40,12 +40,20 @@ jobs:
 
       - name: Build driver
         run: |
-          cd driver
-          cargo build --release
-        env:
-          RUSTFLAGS: "-Z pre-link-arg=/DRIVER -Z pre-link-arg=/SUBSYSTEM:NATIVE"
+          cargo build -p monitor-splitter-driver --release
+
+      - name: Detect driver binary
+        id: detect-driver
+        shell: pwsh
+        run: |
+          if (Test-Path "target/release/monitor_splitter_driver.sys") {
+            "has_sys=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            "has_sys=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
 
       - name: Create self-signed test certificate
+        if: steps.detect-driver.outputs.has_sys == 'true'
         run: |
           $cert = New-SelfSignedCertificate `
             -Type CodeSigningCert `
@@ -56,6 +64,7 @@ jobs:
           echo "CERT_THUMBPRINT=$thumbprint" >> $env:GITHUB_ENV
 
       - name: Sign driver
+        if: steps.detect-driver.outputs.has_sys == 'true'
         run: |
           $inf = "driver/MonitorSplitter.inf"
           # Sign the .sys file
@@ -74,6 +83,7 @@ jobs:
             target/release/monitor_splitter_driver.sys
             driver/MonitorSplitter.inf
             target/release/*.cat
+          if-no-files-found: warn
 
   # ─── App (builds on Windows for releases) ──────────────────────────────────
   build-app:
@@ -146,4 +156,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: MonitorSplitter-Setup.exe
+
 
