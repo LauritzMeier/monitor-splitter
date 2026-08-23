@@ -26,6 +26,8 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: Install NSIS
         shell: pwsh
         run: |
@@ -86,6 +88,7 @@ jobs:
             gh release create $tag --title $tag --generate-notes
           }
           gh release upload $tag installer/MonitorSplitter-Setup.exe --clobber
+
 
 
 
