@@ -25,6 +25,7 @@ fn main() {
             commands::apply_split,
             commands::remove_splits,
             commands::remove_all,
+            commands::ping_driver,
             commands::get_presets,
             commands::save_preset,
             commands::delete_preset,
@@ -38,6 +39,7 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
 
 
 

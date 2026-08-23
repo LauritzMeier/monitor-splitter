@@ -50,7 +50,7 @@ Section "Monitor Splitter App" SecApp
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MonitorSplitter" \
     "Publisher" "Monitor Splitter Project"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MonitorSplitter" \
-    "DisplayVersion" "0.1.0"
+    "DisplayVersion" "0.1.1"
 SectionEnd
 
 !ifndef SKIP_DRIVER
@@ -107,5 +107,6 @@ SectionEnd
   !insertmacro MUI_DESCRIPTION_TEXT ${SecTestSign} "Enable Windows test signing mode (required for the driver to load without an EV certificate)."
 !endif
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
+
 
 

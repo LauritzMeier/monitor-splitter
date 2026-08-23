@@ -2,6 +2,27 @@
 
 use monitor_splitter_common::*;
 
+fn os_monitor_list(app: &tauri::AppHandle) -> Result<Vec<PhysicalMonitor>, String> {
+    let monitors = app
+        .available_monitors()
+        .map_err(|e| format!("Failed to enumerate system monitors: {}", e))?;
+
+    Ok(monitors
+        .into_iter()
+        .enumerate()
+        .map(|(index, monitor)| PhysicalMonitor {
+            index: index as u32,
+            name: monitor
+                .name()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| format!("Monitor {}", index + 1)),
+            width: monitor.size().width,
+            height: monitor.size().height,
+            refresh_rate: 60,
+        })
+        .collect())
+}
+
 #[cfg(windows)]
 async fn send_driver_message(msg: AppToDriver) -> Result<DriverToApp, String> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -43,12 +64,17 @@ async fn send_driver_message(_msg: AppToDriver) -> Result<DriverToApp, String> {
 }
 
 #[tauri::command]
-pub async fn get_physical_monitors() -> Result<Vec<PhysicalMonitor>, String> {
-    match send_driver_message(AppToDriver::QueryMonitors).await? {
-        DriverToApp::MonitorList { monitors } => Ok(monitors),
-        DriverToApp::Error { message } => Err(message),
-        other => Err(format!("Unexpected response from driver: {:?}", other)),
+pub async fn get_physical_monitors(app: tauri::AppHandle) -> Result<Vec<PhysicalMonitor>, String> {
+    match send_driver_message(AppToDriver::QueryMonitors).await {
+        Ok(DriverToApp::MonitorList { monitors }) => Ok(monitors),
+        Ok(DriverToApp::Error { message }) => Err(message),
+        Ok(other) => Err(format!("Unexpected response from driver: {:?}", other)),
+        Err(e) => Err(e),
     }
+    .or_else(|driver_error| {
+        tracing::warn!("Driver monitor query failed, falling back to OS monitor list: {}", driver_error);
+        os_monitor_list(&app)
+    })
 }
 
 #[tauri::command]
@@ -92,6 +118,15 @@ pub async fn remove_all() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn ping_driver() -> Result<(), String> {
+    match send_driver_message(AppToDriver::Ping).await? {
+        DriverToApp::Pong => Ok(()),
+        DriverToApp::Error { message } => Err(message),
+        other => Err(format!("Unexpected response from driver: {:?}", other)),
+    }
+}
+
+#[tauri::command]
 pub async fn get_presets() -> Result<Vec<Preset>, String> {
     // TODO: Load from config
     Ok(vec![])
@@ -122,6 +157,9 @@ pub async fn save_config(config: AppConfig) -> Result<(), String> {
     // TODO: Persist config
     Ok(())
 }
+
+
+
 
 
 

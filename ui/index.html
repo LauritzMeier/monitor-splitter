@@ -12,6 +12,7 @@
     header h1 { font-size:1.15rem; font-weight:600; }
     .status { font-size:.72rem; padding:.2rem .6rem; border-radius:10px; background:var(--bg2); color:var(--fg3); border:1px solid var(--border); }
     .status.ok { color:#6c6; border-color:#363; background:#161; }
+    .err { margin-top:.55rem; font-size:.76rem; color:#f5a1a1; min-height:1.1em; }
     section { margin-bottom:.9rem; padding:.9rem; background:var(--bg2); border-radius:8px; border:1px solid var(--border); }
     h2 { font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--fg2); margin-bottom:.6rem; font-weight:600; }
     .canvas-wrap { background:#0a0a0a; border-radius:6px; padding:.5rem; }
@@ -24,6 +25,7 @@
     select { background:var(--bg3); color:var(--fg); border:1px solid var(--border); border-radius:5px; padding:.35rem .5rem; font-size:.8rem; min-width:360px; }
     .actions { display:flex; gap:.35rem; margin-top:.5rem; }
     button { padding:.4rem .8rem; border:none; border-radius:5px; font-size:.75rem; font-weight:500; cursor:pointer; transition:opacity .15s; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
     button:hover { opacity:.85; } button:active { opacity:.7; }
     .btn-p { background:var(--accent); color:#fff; }
     .btn-g { background:transparent; color:var(--fg2); border:1px solid var(--border); }
@@ -41,6 +43,7 @@
     <h1>Monitor Splitter</h1>
     <div class="status" id="status">Disconnected</div>
   </header>
+  <div class="err" id="err"></div>
 
   <section>
     <h2>Monitor</h2>
@@ -57,9 +60,10 @@
     <h2>Splits</h2>
     <div id="list"></div>
     <div class="actions">
-      <button class="btn-p" onclick="addSplit()">+ Add</button>
+      <button class="btn-g" onclick="addSplit()">+ Add</button>
       <button class="btn-g" onclick="removeLast()">Remove last</button>
       <button class="btn-d" onclick="reset()">Reset</button>
+      <button class="btn-p" id="apply-btn" onclick="applyChanges()" disabled>Apply</button>
     </div>
   </section>
 
@@ -81,6 +85,7 @@ let S = [];
 let M = [];
 let monitorIndex = 0;
 let PW = 3840, PH = 1080;
+let dirty = false;
 const C = ["#5b9bf7","#6c6","#f7a35b","#c77dff","#e55","#5be5e5"];
 const cv = document.getElementById("cv");
 const cx = cv.getContext("2d");
@@ -128,6 +133,32 @@ function renderMonitorSelect() {
   el.value = String(monitorIndex);
 }
 
+function errText(e) {
+  if (typeof e === "string") return e;
+  if (e && typeof e.message === "string") return e.message;
+  try { return JSON.stringify(e); } catch (_) { return String(e); }
+}
+
+function setStatus(text, ok) {
+  const s = document.getElementById("status");
+  s.textContent = text;
+  if (ok) s.classList.add("ok"); else s.classList.remove("ok");
+}
+
+function setError(text) {
+  document.getElementById("err").textContent = text || "";
+}
+
+function syncApplyButton() {
+  document.getElementById("apply-btn").disabled = !dirty;
+}
+
+function markDirty() {
+  dirty = true;
+  syncApplyButton();
+  setStatus("Pending changes", false);
+}
+
 function onMonitorChange(value) {
   monitorIndex = Number(value);
   const monitor = M.find((m) => m.index === monitorIndex);
@@ -135,16 +166,16 @@ function onMonitorChange(value) {
   PW = monitor.width;
   PH = monitor.height;
   renderList();
-  if (S.length) send();
+  if (S.length) markDirty();
 }
 
-function slide(i,v){ S[i]=+v; renderList(); send(); }
+function slide(i,v){ S[i]=+v; renderList(); markDirty(); }
 
 // ── actions ──
-function addSplit(){ S.push(S.length?S[S.length-1]:50); renderList(); send(); }
-function removeLast(){ S.pop(); renderList(); send(); }
-function reset(){ S=[]; renderList(); invoke("remove_splits", { monitorIndex }).catch(()=>{}); }
-function preset(arr){ S=[...arr]; document.querySelectorAll(".presets button").forEach(b=>b.classList.remove("on")); event.target.classList.add("on"); renderList(); send(); }
+function addSplit(){ S.push(S.length?S[S.length-1]:50); renderList(); markDirty(); }
+function removeLast(){ S.pop(); renderList(); markDirty(); }
+function reset(){ S=[]; renderList(); markDirty(); }
+function preset(arr){ S=[...arr]; document.querySelectorAll(".presets button").forEach(b=>b.classList.remove("on")); event.target.classList.add("on"); renderList(); markDirty(); }
 
 // ── driver IPC ──
 async function invoke(cmd, args) {
@@ -152,24 +183,36 @@ async function invoke(cmd, args) {
   throw new Error("no tauri");
 }
 
-function send() {
-  if(!S.length) return;
-  invoke("apply_split", { config: { monitor_index: monitorIndex, regions: regions(), preset_name: null } })
+function applyChanges() {
+  if (!dirty) return;
+
+  if (!M.length) {
+    setStatus("No monitor selected", false);
+    setError("No physical monitor is available to apply changes to.");
+    return;
+  }
+
+  setError("");
+  const request = S.length
+    ? invoke("apply_split", { config: { monitor_index: monitorIndex, regions: regions(), preset_name: null } })
+    : invoke("remove_splits", { monitorIndex });
+
+  request
     .then(() => {
-      const s = document.getElementById("status");
-      s.textContent = "Applied";
-      s.classList.add("ok");
+      dirty = false;
+      syncApplyButton();
+      setStatus("Applied", true);
     })
     .catch((e) => {
-      const s = document.getElementById("status");
-      s.textContent = "Apply failed";
-      s.classList.remove("ok");
+      setStatus("Apply failed", false);
+      setError(errText(e));
       console.error(e);
     });
 }
 
 async function init() {
-  const s = document.getElementById("status");
+  syncApplyButton();
+  setError("");
   try {
     M = await invoke("get_physical_monitors");
     if (M.length) {
@@ -178,12 +221,18 @@ async function init() {
       PH = M[0].height;
     }
     renderMonitorSelect();
-    s.textContent = "Connected";
-    s.classList.add("ok");
+    try {
+      await invoke("ping_driver");
+      setStatus("Connected", true);
+    } catch (e) {
+      setStatus("Driver unavailable", false);
+      setError(errText(e));
+    }
   } catch (e) {
+    M = [];
     renderMonitorSelect();
-    s.textContent = "Driver unavailable";
-    s.classList.remove("ok");
+    setStatus("Monitor detection failed", false);
+    setError(errText(e));
     console.error(e);
   }
 }
@@ -194,5 +243,8 @@ draw();
 </script>
 </body>
 </html>
+
+
+
 
 

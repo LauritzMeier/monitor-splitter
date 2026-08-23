@@ -6,7 +6,7 @@ on:
       tag:
         description: "Tag to publish (e.g. v0.1.0)"
         required: true
-        default: "v0.1.0"
+        default: "v0.1.1"
       require_driver:
         description: "Fail build if driver artifacts are missing"
         required: true
@@ -115,6 +115,7 @@ jobs:
             gh release create $tag --title $tag --generate-notes
           }
           gh release upload $tag installer/MonitorSplitter-Setup.exe --clobber
+
 
 
 
