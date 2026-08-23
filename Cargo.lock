@@ -1816,7 +1816,7 @@ dependencies = [
 
 [[package]]
 name = "monitor-splitter-app"
-version = "0.1.1"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "directories",
@@ -1833,7 +1833,7 @@ dependencies = [
 
 [[package]]
 name = "monitor-splitter-common"
-version = "0.1.1"
+version = "0.1.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -1841,7 +1841,7 @@ dependencies = [
 
 [[package]]
 name = "monitor-splitter-driver"
-version = "0.1.1"
+version = "0.1.6"
 dependencies = [
  "monitor-splitter-common",
  "serde",
