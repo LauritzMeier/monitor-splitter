@@ -53,6 +53,7 @@ Section "Monitor Splitter App" SecApp
     "DisplayVersion" "0.1.0"
 SectionEnd
 
+!ifndef SKIP_DRIVER
 Section "Virtual Display Driver" SecDriver
   SectionIn RO ; Required
 
@@ -72,12 +73,14 @@ Section "Enable Test Signing" SecTestSign
   MessageBox MB_YESNO "Test signing has been enabled. A reboot is required for the driver to load. Reboot now?" IDNO +2
     Reboot
 SectionEnd
+!endif
 
 ; ─── Uninstaller ─────────────────────────────────────────────────────────────
 
 Section "Uninstall"
-  ; Remove driver
-  nsExec::ExecToLog 'pnputil /delete-driver "$INSTDIR\driver\MonitorSplitter.inf" /uninstall'
+  ; Remove driver if it was installed
+  IfFileExists "$INSTDIR\driver\MonitorSplitter.inf" 0 +2
+    nsExec::ExecToLog 'pnputil /delete-driver "$INSTDIR\driver\MonitorSplitter.inf" /uninstall'
 
   ; Remove files
   Delete "$INSTDIR\monitor-splitter.exe"
@@ -99,7 +102,10 @@ SectionEnd
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecApp} "The Monitor Splitter application with UI and hotkey support."
+!ifndef SKIP_DRIVER
   !insertmacro MUI_DESCRIPTION_TEXT ${SecDriver} "The IddCx virtual display driver that creates virtual monitors."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecTestSign} "Enable Windows test signing mode (required for the driver to load without an EV certificate)."
+!endif
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
+
 
