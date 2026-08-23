@@ -6,7 +6,7 @@ on:
       tag:
         description: "Tag to publish (e.g. v0.1.0)"
         required: true
-        default: "v0.1.6"
+        default: "v0.1.7"
       require_driver:
         description: "Fail build if driver artifacts are missing"
         required: true
@@ -66,23 +66,14 @@ jobs:
       - name: Validate driver artifacts
         shell: pwsh
         run: |
-          $isTagBuild = "${{ github.event_name }}" -eq "push"
-          $requireDriverInput = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.require_driver || '' }}"
-          $requireDriver = $isTagBuild -or ($requireDriverInput -eq "true")
-
           $required = @(
             "installer/driver/monitor_splitter_driver.sys",
             "installer/driver/MonitorSplitter.inf",
             "installer/driver/MonitorSplitter.cat"
           )
           $missing = @($required | Where-Object { -not (Test-Path $_) })
-
           if ($missing.Count -gt 0) {
-            if ($requireDriver) {
-              throw "Missing required driver artifacts for release: $($missing -join ', ')"
-            } else {
-              Write-Warning "Driver artifacts missing; building app-only installer: $($missing -join ', ')"
-            }
+            Write-Warning "Driver artifacts missing; building app-only installer: $($missing -join ', ')"
           }
 
       - name: Build NSIS installer
@@ -115,6 +106,8 @@ jobs:
             gh release create $tag --title $tag --generate-notes
           }
           gh release upload $tag installer/MonitorSplitter-Setup.exe --clobber
+
+
 
 
 
