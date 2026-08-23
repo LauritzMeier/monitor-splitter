@@ -126,12 +126,25 @@ jobs:
           path: installer/app/
 
       - name: Install NSIS
-        run: choco install nsis -y
+        shell: pwsh
+        run: |
+          choco install nsis --no-progress -y
+          $nsisDir = "C:\Program Files (x86)\NSIS"
+          if (!(Test-Path "$nsisDir\makensis.exe")) { throw "makensis.exe not found at $nsisDir" }
+          $nsisDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          where.exe makensis
 
       - name: Build installer
+        shell: pwsh
         run: |
-          cd installer
-          makensis installer.nsi
+          $hasDriver = (Test-Path "installer/driver/monitor_splitter_driver.sys") -and (Test-Path "installer/driver/MonitorSplitter.cat")
+          Push-Location installer
+          if ($hasDriver) {
+            & makensis installer.nsi
+          } else {
+            & makensis /DSKIP_DRIVER installer.nsi
+          }
+          Pop-Location
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -156,5 +169,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: MonitorSplitter-Setup.exe
+
 
 
